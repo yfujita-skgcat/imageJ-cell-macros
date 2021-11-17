@@ -1,0 +1,12 @@
+#*.ijm
+*.jar
+Test.ijm
+Test.erb
+#HeatMapImage.erb
+#HeatMapImage.ijm
+#MergeTmp.erb
+#MergeTmp.ijm
+#Stamp_Region.erb
+#Stamp_Region.ijm
+#CountEcoliColony.erb
+#CountEcoliColony.ijm

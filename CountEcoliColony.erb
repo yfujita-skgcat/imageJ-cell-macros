@@ -1,0 +1,132 @@
+<%# encoding: utf-8 %>
+<%= ERB.new(File.open("CommonFunction.txt", "r:UTF-8").read, nil, nil, "_erbout1").result(binding) %>
+
+
+
+// main script
+
+config = load_config("CountEcoliColony");
+default = newArray("1", "0", "100", "1", "20-250", "0.8-1", 0); // interval, white_background, ball_size, watershed, size, circ, remove_outline
+if(config.length != default.length){
+  config = default;
+}
+
+
+Dialog.create("Subtraction setting.");
+Dialog.addMessage("Macros can be stopped by ESC");
+Dialog.addNumber("interval", config[0]);
+Dialog.addCheckbox("light background?", config[1]);
+Dialog.addNumber("ball", config[2]);
+Dialog.addCheckbox("Do watershed?", config[3]);
+Dialog.addString("size (default 50-250)", config[4]);
+Dialog.addString("circularity (default 0.5-1, max 1)", config[5]);
+Dialog.addNumber("Ignore outline pixel. (60 pixel may be good).", config[6]);
+Dialog.show();
+config[0] = Dialog.getNumber();   // interval
+config[1] = Dialog.getCheckbox(); // light
+config[2] = Dialog.getNumber();   // ball
+config[3] = Dialog.getCheckbox(); // watershed
+config[4] = Dialog.getString();   // size
+config[5] = Dialog.getString();   // circ
+config[6] = Dialog.getNumber();   // ignore outline
+
+save_config("CountEcoliColony", config);
+
+interval = parseInt(config[0]);
+light = config[1];
+ball  = config[2];
+watershed = config[3];
+size  = config[4];
+circularity = config[5];
+outline = parseInt(config[6]);
+
+
+roiManager("add");
+roi_index = roiManager("count");
+
+select_x = 0;
+select_y = 0;
+select_width    = 0;
+select_height   = 0;
+Roi.getBounds(select_x, select_y, select_width, select_height);
+center_x = select_width / 2 + select_x;
+center_y = select_height / 2 + select_y;
+inside_x      = select_x + outline;
+inside_y      = select_y + outline;
+inside_width  = select_width  - 2 * outline;
+inside_height = select_height - 2 * outline;
+
+original_id = getImageID();
+selectImage(original_id);
+info_wait(interval);
+// 一旦選択を外してから全体を使ってbackground補正する.
+run("Select None");
+run("Duplicate...", "title=cropped_imate.tif");
+info_wait(interval);
+duplicate_id = getImageID();
+info_wait(interval);
+selectImage(duplicate_id);
+info_wait(interval);
+
+if(ball > 0 ){
+  if(light){
+    run("Subtract Background...", "rolling=" + ball + " light");
+  } else {
+    run("Subtract Background...", "rolling=" + ball);
+  }
+}
+
+info_wait(interval);
+selectImage(original_id);
+info_wait(interval);
+if( outline > 0 ){
+  makeOval(inside_x, inside_y, inside_width, inside_height);
+} else {
+  roiManager("select", roi_index - 1);
+}
+info_wait(interval);
+run("Crop");
+
+selectImage(duplicate_id);
+info_wait(interval);
+if( outline > 0 ){
+  makeOval(inside_x, inside_y, inside_width, inside_height);
+} else {
+  roiManager("select", roi_index - 1);
+}
+info_wait(interval);
+run("Crop");
+run("Make Inverse");
+run("Fill", "slice");
+run("8-bit");
+run("Set Scale...", "distance=0 known=0 pixel=1 unit=pixel");
+run("Select None");
+
+
+waitForUser("Set threshold");
+run("Threshold...");
+//setAutoThreshold("Default");
+run("Convert to Mask");
+if( watershed ){
+  log_info("Do watershed");
+  run("Watershed");
+} else {
+  log_info("Do watershed");
+}
+run("Create Selection");
+bin_id = getImageID();
+
+//setAutoThreshold("Moments");
+//setAutoThreshold("Default");
+//run("Create Selection");
+//run("Analyze Particles...", "size=50-250 circularity=0.50-1.00 show=Outlines display clear");
+//run("Analyze Particles...", "size=50-250 circularity=0.50-1.00 show=Nothing display clear");
+run("Analyze Particles...", "size=" + size + " circularity=" + circularity + " show=Masks display clear");
+mask_id = getImageID();
+selectImage(bin_id);
+close();
+selectImage(mask_id);
+wait(2000);
+run("Invert", "slice");
+run("Images to Stack", "name=Stack title=[] use");
+
